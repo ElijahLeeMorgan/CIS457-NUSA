@@ -1,6 +1,7 @@
 from socket import socket, AF_INET, SOCK_STREAM, SOL_SOCKET, SO_REUSEADDR
 from threading import Thread
 from time import sleep
+from re import search, sub
 
 # Me when the multi-thread :O
 
@@ -65,19 +66,46 @@ def parseMsgBody(inputSocket:socket) -> bytearray:
 '''
 
 def emailClean(emailBytes:bytearray) -> str:
-    return emailBytes.decode().strip("<>:")
+    return sub("[<:>]", '', emailBytes.decode())
+
+def emailVerify(clientSocket:socket, email:str) -> None:
+    # Validate email characters, format, and number of @ symbols.
+    # Borrowed from: https://formulashq.com/the-ultimate-guide-to-regex-for-alphanumeric-characters/#10
+    validChars = "[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}"
+    validTLDs = "\.(com|org|net|edu|io|app)$"
+
+    # This could be done wiht one giant express, but who wants to debug that?
+    # Plus, this means I can have seprate error messages.
+
+    if search("^@.*", email):
+        return "550 Empty username"
+    if search("@\..*$", email):
+        return "550 Empty domain"
+    if search("\.$", email):
+        return "550 Empty TLD"
+    if not search(validChars, email):
+        return "550 Invalid email address"
+
+    # Validates accepted TLDs
+    if not search(validTLDs, email):
+        return "550 Unknown TLD"
+    
+    return "250 OK"
+
+
+
 
 def returnMsg(clientSocket:socket, message:str) -> None:
     print("Sending message: ", message)
     clientSocket.sendall(f"{message}\r\n".encode())
 
 def recieveClientdata(clientSocket) -> str:
-    buffer = bytearray()
     print("INIT TCP Exchange")
     returnMsg(clientSocket, "220 localhost")
 
     sender = ""
-    recipients = []
+    recipients = ""
+    email = ""
 
     while True:
         #TODO add timeout (say, 10-20 iterations)
@@ -102,18 +130,25 @@ def recieveClientdata(clientSocket) -> str:
                 returnMsg(clientSocket, "250 OK")
             case b"RCPT":
                 # Extract recipient
+                #TODO Verify emails address format, return correct error code otherwise.
                 #NOTE Assumes that response starts with "RCPT TO:"
-                recipients.append(emailClean(data[7:]))
-                returnMsg(clientSocket, "250 OK")
+                print("Uncleaned Recipient: ", data[7:])
+                recipient = emailClean(data[7:])
+                print("Cleaned Recipient: ", recipient)
+                returnMsg(clientSocket, emailVerify(clientSocket, recipient))
             case b"DATA":
                 returnMsg(clientSocket, "354 Start mail input")
                 # Extract headers and message
+                while b"\r\n.\r\n" not in (buffer := clientSocket.recv(1024)):
+                    print(buffer.decode)
+                print("End of email")
+                
+                
+                #while b"\r\n.\r\n" not in (buffer := clientSocket.recv(1024)):
+                #    email += buffer.decode()
                 #TODO write function to collect entire email (up until .)
-                # write seprate function to parse headers
-                # write one more funciton to parse subject
                 #TODO Output data to local vars.
                 returnMsg(clientSocket, "250 OK")
-                sleep(0.5)
             case b"QUIT":
                 returnMsg(clientSocket, "221 Goodbye") #TODO Change back to OK after bugtesting.
                 clientSocket.close()
@@ -124,10 +159,11 @@ def recieveClientdata(clientSocket) -> str:
                 clientSocket.sendall(b"500 Unknown command\r\n")
                 break #TODO remove break after debugging
         sleep(0.5) #TODO, set to smaller value after debugging
-
+    return sender, recipients, email
         
     
-
+def thread_target(clientSocket, result):
+    result.append(recieveClientdata(clientSocket))
 
 # NOTE Remember, all sent mail just goes to /dev/null
 # NUSA: NUll Submission Agent
@@ -138,7 +174,6 @@ def main():
     welcomeSocket.setsockopt(SOL_SOCKET, SO_REUSEADDR, 1) # As per professor's suggestion
     welcomeSocket.bind(("", 9000))
     welcomeSocket.listen(4)    # Max backlog 4 connections
-    data = bytearray()
 
     #TODO add while loop, and room for 4 connections.
     # Add timeout and CLI kill option.
@@ -148,11 +183,9 @@ def main():
     connectionSocket, addr = welcomeSocket.accept()
     print ("Accept a new connection", addr)
 
-    connectionData = Thread(target = recieveClientdata, args=(connectionSocket,))
+    connectionData = Thread(target=thread_target, args=(connectionSocket, []))
     connectionData.start()
-
-    #TODO write funciton to format email and print to stdout
-    # See return values of connectionData
+    #connectionData.join()  # Wait for the thread to finish
 
     sleep(5) #TODO reduce after debugging.
     
