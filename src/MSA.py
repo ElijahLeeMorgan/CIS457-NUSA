@@ -155,7 +155,7 @@ def recieveClientdata(clientSocket) -> str:
                 returnMsg(clientSocket, "500 Unknown command")
     return sender, recipients, email
         
-def thread_target(clientSocket, result):
+def threadTarget(clientSocket, result):
     result.append(recieveClientdata(clientSocket))
 
 def main():
@@ -173,7 +173,7 @@ def main():
         connectionSocket, addr = welcomeSocket.accept()
         print(getSeperatorBar(), f"Accept a new connection at {addr[0]}:{addr[1]}")
 
-        connectionData = Thread(target=thread_target, args=(connectionSocket, []))
+        connectionData = Thread(target=threadTarget, args=(connectionSocket, []))
         connectionData.start()
         threads.append(connectionData)
 
@@ -181,7 +181,7 @@ def main():
         threads = [t for t in threads if t.is_alive()]
 
     welcomeSocket.close()
-    print("End of server")
+    print("Shutting down server...")
 
 if __name__ == "__main__":
     main()

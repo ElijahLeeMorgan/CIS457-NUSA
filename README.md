@@ -34,9 +34,9 @@ Your MSA implementation will not push the incoming messages to the actual mail t
   
   * Any type of attachment in the message body
 
-## Incomplete
-
  * It shall be designed to handle several MUA client connections simultaneously. Use Python thread and use a new thread to execute the function that handles individual client interactions. Refer to the section Using Thread below.
+
+## Incomplete
 
 ### Extra Credit
 For an extra credit, parse the message body for attachments and count the number of attached files. Respond with an error code 550 if too many files (> 5) are attached in the message.
