@@ -2,19 +2,11 @@ from socket import socket, AF_INET, SOCK_STREAM, SOL_SOCKET, SO_REUSEADDR
 from threading import Thread
 from time import sleep
 from re import search, sub
-
-# Me when the multi-thread :O
-
-#def someWork(val):
-#    for k in range(20):
-#        print(f"In function {x}")
-#        sleep(0.4)   # 400 milliseconds
-#
-#t1 = Thread(target = someWork, args=(51,))
-#t1.start()
-#for m in range(20):
-#    print(f"In Main {m}")
-#    sleep(0.25)   # 250 milliseconds
+'''
+NUSA: NUll Submission Agent
+Elijah Morgan
+CIS 457 02
+'''
 
 '''
 C: (Initiate connection)
@@ -56,15 +48,6 @@ ail server which will never fill up your mailbox?\r
 \n.\r\n
 '''
 
-'''
-def parseMsgBody(inputSocket:socket) -> bytearray:
-    data = bytearray()
-    while b"\r\n.\r\n" not in (buffer := inputSocket.recv(1024)):
-        data.extend(buffer)
-    data.extend(buffer) # Add the last buffer (contains \r\n aka command deliminator)
-    return data
-'''
-
 def emailClean(emailBytes:bytearray) -> str:
     return sub("[<:>]\r\n", '', emailBytes.decode())
 
@@ -92,9 +75,6 @@ def emailVerify(email:str) -> str:
         return "550 Unknown TLD"
     
     return "250 OK"
-
-
-
 
 def returnMsg(clientSocket:socket, message:str) -> None:
     print("Sending message: ", message)
@@ -179,15 +159,11 @@ def recieveClientdata(clientSocket) -> str:
                 print("Unknown Command")
                 clientSocket.sendall(b"500 Unknown command\r\n")
                 break #TODO remove break after debugging
-        sleep(0.5) #TODO, set to smaller value after debugging
+        #sleep(0.5) #TODO, set to smaller value after debugging
     return sender, recipients, email
         
-    
 def thread_target(clientSocket, result):
     result.append(recieveClientdata(clientSocket))
-
-# NOTE Remember, all sent mail just goes to /dev/null
-# NUSA: NUll Submission Agent
 
 def main():
     # Create a TCP socket that listens to port 9000 on the local host
