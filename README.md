@@ -13,12 +13,6 @@ Your MSA implementation will not push the incoming messages to the actual mail t
 
 ## Complete
 
-* N/A
-
-## Incomplete
-
-
-
 * Verify the recipient address (provided in RCPT TO) satisfy the following rules for a valid email:
   * Ends with .com, .org, .net, .edu, .io, .app
   * It contains exactly one @ character separating the username and domain name
@@ -27,10 +21,12 @@ Your MSA implementation will not push the incoming messages to the actual mail t
 
     When any of these rules is not satisfied, the MSA must respond with 550 status that includes the nature of the error after the numeric code, such as 550 Unknown TLD
 
+* Verify that the client does not attempt to send the message to more than five recipient. Otherwise, respond with 550 status that includes the nature of the error after the numeric code, such as 550 Too many recipients.
+
+## Incomplete
+
 * Verify the subject line (embedded in the message header) is not blank.
   * The RFC5321 standard specifies several possible error codes when handling the DATA command: 450, 451, 452, 550, 552, and 554. Among these options, 451 error code seems to be the most appropriate.
-
-* Verify that the client does not attempt to send the message to more than five recipient. Otherwise, respond with 550 status that includes the nature of the error after the numeric code, such as 550 Too many recipients.
 
 * Print the entire message body to stdout. Your code shall be able to consume message body beyond the buffer size used for reading incoming bytes from the socket.
 

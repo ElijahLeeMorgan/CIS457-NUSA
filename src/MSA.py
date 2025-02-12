@@ -66,16 +66,17 @@ def parseMsgBody(inputSocket:socket) -> bytearray:
 '''
 
 def emailClean(emailBytes:bytearray) -> str:
-    return sub("[<:>]", '', emailBytes.decode())
+    return sub("[<:>]\r\n", '', emailBytes.decode())
 
-def emailVerify(clientSocket:socket, email:str) -> None:
+def emailVerify(email:str) -> str:
     # Validate email characters, format, and number of @ symbols.
     # Borrowed from: https://formulashq.com/the-ultimate-guide-to-regex-for-alphanumeric-characters/#10
     validChars = "[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}"
     validTLDs = "\.(com|org|net|edu|io|app)$"
 
-    # This could be done wiht one giant express, but who wants to debug that?
+    # This could be done with one giant regular expression, but who wants to debug that?
     # Plus, this means I can have seprate error messages.
+    print("Validating email: ", email.encode())
 
     if search("^@.*", email):
         return "550 Empty username"
@@ -104,7 +105,7 @@ def recieveClientdata(clientSocket) -> str:
     returnMsg(clientSocket, "220 localhost")
 
     sender = ""
-    recipients = ""
+    recipients = []
     email = ""
 
     while True:
@@ -135,14 +136,26 @@ def recieveClientdata(clientSocket) -> str:
                 print("Uncleaned Recipient: ", data[7:])
                 recipient = emailClean(data[7:])
                 print("Cleaned Recipient: ", recipient)
-                returnMsg(clientSocket, emailVerify(clientSocket, recipient))
+
+                returnCode = emailVerify(recipient)
+                if returnCode == "250 OK":
+                    # Add recipient to list, normal behavior.
+                    recipients.append(recipient)
+                
+                if len(recipients) > 5:
+                    # As per project guidelines, reject any more than 5 recipients.
+                    returnCode = "452 Too many recipients"
+
+                returnMsg(clientSocket, returnCode)
             case b"DATA":
                 returnMsg(clientSocket, "354 Start mail input")
                 # Extract headers and message
-                while b"\r\n.\r\n" not in (buffer := clientSocket.recv(1024)):
-                    print(buffer.decode)
+                data = clientSocket.recv(1024)
+                timeout = 0
+                while b"\r\n.\r\n" not in data:
+                    print(data)
+                    data += clientSocket.recv(1024)
                 print("End of email")
-                
                 
                 #while b"\r\n.\r\n" not in (buffer := clientSocket.recv(1024)):
                 #    email += buffer.decode()
