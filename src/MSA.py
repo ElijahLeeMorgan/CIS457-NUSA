@@ -1,6 +1,5 @@
 from socket import socket, AF_INET, SOCK_STREAM, SOL_SOCKET, SO_REUSEADDR
-from threading import Thread
-from time import sleep
+from threading import Thread, Event
 from re import search, sub
 '''
 NUSA: NUll Submission Agent
@@ -8,45 +7,15 @@ Elijah Morgan
 CIS 457 02
 '''
 
-'''
-C: (Initiate connection)
-                                   S: (Accept connection request)
-                                   S: 220 nusa.foo.net
-C: EHLO nusa.foo.net
-                                   S: 502 OK
-C: HELO nusa.foo.net
-                                   S: 250 OK
-C: MAIL FROM:<me@foo.net>
-                                   S: 250 OK
-C: RCPT TO:<you@mail.app>
-                                   S: 250 OK
-C: DATA
-                                   S: 354 OK
-C: Message-ID: 7123-dd-fc62
-Date: Thu, 16 May 2024 10:22:37 -0500
-To: you@mail.app
-From: Mason Engelberg <me@foo.net>
-Subject: Breaking News
-Content-Transfer-Encoding: 7bit
-Content-Language: en-US
-
-Have you heard about NUSA? An email server which will never
-fill up your mailbox?
-.
-                                   S: 250 OK
-C: QUIT
-                                   S: 221 OK
-
-
-Message is really sent like this (bytecode)
-Message-ID: 7123-dd-fc62\r\nDate: Thu, 16 May 2024
- 10:22:37 -0500\r\nTo: you@mail.app\r\nFrom: Mason
- Engelberg <me@foo.net>\r\nSubject: Breaking News\r
-\nContent-Transfer-Encoding: 7bit\r\nContent-Langu
-age: en-US\r\n\r\nHave you heard about NUSA? An em
-ail server which will never fill up your mailbox?\r
-\n.\r\n
-'''
+def shutdownKeyboardInput(event:Event) -> None:
+    # Sets shutdown event on user input.
+    while not event.is_set():
+        keyboardInput = input()
+        #print(keyboardInput)
+        if keyboardInput == "exit":
+            print("Shutting down server, do not close this window.")
+            event.set()
+    
 def getSeperatorBar() -> str:
     # Used for cleaner formatting. Better practice would be to override print function in a class. Too lazy though.
     return f"\n{'=' * 100}\n\n"
@@ -134,7 +103,7 @@ def recieveClientdata(clientSocket) -> str:
                 # Extract headers and message
                 data = clientSocket.recv(1024)
                 timeout = 0
-                while b"\r\n.\r\n" not in data:
+                while not data.endswith(b"\r\n.\r\n"):
                     email += data.decode()
                     data += clientSocket.recv(1024)
                 
@@ -164,24 +133,34 @@ def main():
     welcomeSocket.setsockopt(SOL_SOCKET, SO_REUSEADDR, 1) # As per professor's suggestion
     welcomeSocket.bind(("", 9000))
     welcomeSocket.listen(4)    # Max backlog 4 connections
+    welcomeSocket.settimeout(3.0) # Set timeout to 2 seconds, allows us to check for user input.
 
-    print('Server is listening on port 9000')
+    print("Server is listening on port 9000\nEnter 'exit' to shutdown server...")
 
-    threads = []
+    # Special thread to handle keyboard input while MSA logic is handled.
+    shutdown = Event()
+    shutdownThread = Thread(target=shutdownKeyboardInput, args=(shutdown, ), daemon=True)
+    shutdownThread.start()
 
-    while True:
-        connectionSocket, addr = welcomeSocket.accept()
-        print(getSeperatorBar(), f"Accept a new connection at {addr[0]}:{addr[1]}")
+    mailThreads = []
+
+    while not shutdown.is_set():
+        try:
+            connectionSocket, addr = welcomeSocket.accept()
+        except TimeoutError:
+            # Repeat loop if no new connections.
+            continue
+        print(getSeperatorBar(), f"Accepted a new connection at {addr[0]}:{addr[1]}")
 
         connectionData = Thread(target=threadTarget, args=(connectionSocket, []))
         connectionData.start()
-        threads.append(connectionData)
+        mailThreads.append(connectionData)
 
         # Clean up finished threads
-        threads = [t for t in threads if t.is_alive()]
+        mailThreads = [t for t in mailThreads if t.is_alive()]
 
     welcomeSocket.close()
-    print("Shutting down server...")
+    print("End of Server")
 
 if __name__ == "__main__":
     main()
