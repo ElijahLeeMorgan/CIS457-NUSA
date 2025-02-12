@@ -47,9 +47,12 @@ age: en-US\r\n\r\nHave you heard about NUSA? An em
 ail server which will never fill up your mailbox?\r
 \n.\r\n
 '''
+def getSeperatorBar() -> str:
+    # Used for cleaner formatting. Better practice would be to override print function in a class. Too lazy though.
+    return f"\n{'=' * 100}\n\n"
 
 def emailClean(emailBytes:bytearray) -> str:
-    return sub("[<:>]\r\n", '', emailBytes.decode())
+    return sub("[<>:]", '', emailBytes.decode()).strip()
 
 def emailVerify(email:str) -> str:
     # Validate email characters, format, and number of @ symbols.
@@ -59,7 +62,7 @@ def emailVerify(email:str) -> str:
 
     # This could be done with one giant regular expression, but who wants to debug that?
     # Plus, this means I can have seprate error messages.
-    print("Validating email: ", email.encode())
+    #print("Validating email: ", email.encode())
 
     if search("^@.*", email):
         return "550 Empty username"
@@ -77,11 +80,13 @@ def emailVerify(email:str) -> str:
     return "250 OK"
 
 def returnMsg(clientSocket:socket, message:str) -> None:
-    print("Sending message: ", message)
+    print("Sending message:\t", message)
     clientSocket.sendall(f"{message}\r\n".encode())
 
 def recieveClientdata(clientSocket) -> str:
-    print("INIT TCP Exchange")
+    seperatorBar = getSeperatorBar()
+    
+    print("INIT TCP Exchange\n", seperatorBar)
     returnMsg(clientSocket, "220 localhost")
 
     sender = ""
@@ -89,13 +94,12 @@ def recieveClientdata(clientSocket) -> str:
     email = ""
 
     while True:
-        #TODO add timeout (say, 10-20 iterations)
         # Recieve data in kilobytes, if no data break loop.
         data = clientSocket.recv(1024)
         state = data[:4]
 
         #Debugging
-        print("Incoming Command: ", state.decode())
+        print("Incoming Command:\t", state.decode())
 
         match state:
             case b"EHLO": # Working
@@ -107,15 +111,13 @@ def recieveClientdata(clientSocket) -> str:
                 # Extract sender
                 #NOTE Assumes that response starts with "MAIL FROM:"
                 sender = emailClean(data[9:])
-                #TODO verify email address format, return correct error code otherwise.
                 returnMsg(clientSocket, "250 OK")
             case b"RCPT":
                 # Extract recipient
-                #TODO Verify emails address format, return correct error code otherwise.
                 #NOTE Assumes that response starts with "RCPT TO:"
-                print("Uncleaned Recipient: ", data[7:])
+                #print("Uncleaned Recipient: ", data[7:])
                 recipient = emailClean(data[7:])
-                print("Cleaned Recipient: ", recipient)
+                print("Recipient:\t\t", recipient) # Cleaned email
 
                 returnCode = emailVerify(recipient)
                 if returnCode == "250 OK":
@@ -134,32 +136,23 @@ def recieveClientdata(clientSocket) -> str:
                 timeout = 0
                 while b"\r\n.\r\n" not in data:
                     email += data.decode()
-                    #print(data)
                     data += clientSocket.recv(1024)
                 
-                print('\n' + '=' * 100, email)
-                print("End of email", '\n' + '=' * 100)
+                
+                print(seperatorBar, email, seperatorBar)
                 
                 # Check for an empty subject. RFC5321
                 if b"Subject:" not in data:
                     returnMsg(clientSocket, "451 Empty subject")
                 else:
                     returnMsg(clientSocket, "250 OK")
-                
-                #while b"\r\n.\r\n" not in (buffer := clientSocket.recv(1024)):
-                #    email += buffer.decode()
-                #TODO write function to collect entire email (up until .)
-                #TODO Output data to local vars.
             case b"QUIT":
-                returnMsg(clientSocket, "221 Goodbye") #TODO Change back to OK after bugtesting.
+                returnMsg(clientSocket, "221 Goodbye")
                 clientSocket.close()
-                #TODO Ouput local vars (see DATA)
-                break #TODO return instead
+                return sender, recipients, email
             case _:
                 print("Unknown Command")
-                clientSocket.sendall(b"500 Unknown command\r\n")
-                break #TODO remove break after debugging
-        #sleep(0.5) #TODO, set to smaller value after debugging
+                returnMsg(clientSocket, "500 Unknown command")
     return sender, recipients, email
         
 def thread_target(clientSocket, result):
@@ -172,22 +165,20 @@ def main():
     welcomeSocket.bind(("", 9000))
     welcomeSocket.listen(4)    # Max backlog 4 connections
 
-    #TODO add while loop, and room for 4 connections.
-    # Add timeout and CLI kill option.
+    print('Server is listening on port 9000')
 
-    # Args must be a list
-    print ('Server is listening on port 9000')
-    connectionSocket, addr = welcomeSocket.accept()
-    print ("Accept a new connection", addr)
+    threads = []
 
-    connectionData = Thread(target=thread_target, args=(connectionSocket, []))
-    connectionData.start()
-    #connectionData.join()  # Wait for the thread to finish
+    while True:
+        connectionSocket, addr = welcomeSocket.accept()
+        print(getSeperatorBar(), f"Accept a new connection at {addr[0]}:{addr[1]}")
 
-    sleep(5) #TODO reduce after debugging.
-    
-    text = "FIXME Placeholder text"
-    print (f"Incoming text is {text}")
+        connectionData = Thread(target=thread_target, args=(connectionSocket, []))
+        connectionData.start()
+        threads.append(connectionData)
+
+        # Clean up finished threads
+        threads = [t for t in threads if t.is_alive()]
 
     welcomeSocket.close()
     print("End of server")
