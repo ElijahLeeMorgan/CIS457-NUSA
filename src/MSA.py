@@ -144,7 +144,7 @@ def recieveClientdata(clientSocket) -> str:
                 
                 if len(recipients) > 5:
                     # As per project guidelines, reject any more than 5 recipients.
-                    returnCode = "452 Too many recipients"
+                    returnCode = "550 Too many recipients"
 
                 returnMsg(clientSocket, returnCode)
             case b"DATA":
@@ -153,15 +153,23 @@ def recieveClientdata(clientSocket) -> str:
                 data = clientSocket.recv(1024)
                 timeout = 0
                 while b"\r\n.\r\n" not in data:
-                    print(data)
+                    email += data.decode()
+                    #print(data)
                     data += clientSocket.recv(1024)
-                print("End of email")
+                
+                print('\n' + '=' * 100, email)
+                print("End of email", '\n' + '=' * 100)
+                
+                # Check for an empty subject. RFC5321
+                if b"Subject:" not in data:
+                    returnMsg(clientSocket, "451 Empty subject")
+                else:
+                    returnMsg(clientSocket, "250 OK")
                 
                 #while b"\r\n.\r\n" not in (buffer := clientSocket.recv(1024)):
                 #    email += buffer.decode()
                 #TODO write function to collect entire email (up until .)
                 #TODO Output data to local vars.
-                returnMsg(clientSocket, "250 OK")
             case b"QUIT":
                 returnMsg(clientSocket, "221 Goodbye") #TODO Change back to OK after bugtesting.
                 clientSocket.close()

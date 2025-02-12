@@ -23,8 +23,6 @@ Your MSA implementation will not push the incoming messages to the actual mail t
 
 * Verify that the client does not attempt to send the message to more than five recipient. Otherwise, respond with 550 status that includes the nature of the error after the numeric code, such as 550 Too many recipients.
 
-## Incomplete
-
 * Verify the subject line (embedded in the message header) is not blank.
   * The RFC5321 standard specifies several possible error codes when handling the DATA command: 450, 451, 452, 550, 552, and 554. Among these options, 451 error code seems to be the most appropriate.
 
@@ -35,6 +33,10 @@ Your MSA implementation will not push the incoming messages to the actual mail t
   * message of any size, specifically your program should not have a limit on the size of message body provided between the DATA command and the end of message marker. Recall that your program is not required to save the message body anywhere, but it must be able to "consume" any amount of bytes from its socket and correctly.
   
   * Any type of attachment in the message body
+
+## Incomplete
+
+ * It shall be designed to handle several MUA client connections simultaneously. Use Python thread and use a new thread to execute the function that handles individual client interactions. Refer to the section Using Thread below.
 
 ### Extra Credit
 For an extra credit, parse the message body for attachments and count the number of attached files. Respond with an error code 550 if too many files (> 5) are attached in the message.
